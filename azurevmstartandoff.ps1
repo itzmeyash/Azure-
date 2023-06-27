@@ -2,61 +2,81 @@
 
 param
 (
-
-    [string]$APP_ID = "1aaf14e1-fd23-4523-8517-75cd77dd3bba",
-
-    [string]$CLIENT_SECRET = "DuI8Q~_IN1rfznJpNS2rE0voqFBn0Gr5LYOxea6Z",
-
-    [string]$TENANT_ID = "b41b72d0-4e9f-4c26-8a69-f949f367c91d",
-
-    [string]$subscription_id = "c96c59e0-a3f1-4d5e-bd1b-7d9ca8c9ebdb"
+    [Parameter(Mandatory = $true)]
+    [string]$APP_ID = "",
+    [Parameter(Mandatory = $true)]
+    [string]$CLIENT_SECRET = "",
+    [Parameter(Mandatory = $true)]
+    [string]$TENANT_ID = "",
+    [Parameter(Mandatory = $true)]
+    [string]$subscription_id = ""
 
 )
-az login --service-principal --username $APP_ID --password $CLIENT_SECRET --tenant $TENANT_ID
+
+# Current Australia Eastern Time
+$ISTTime = [System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId( (Get-date), 'India Standard Time')
+[String]$currentTime = $ISTTime
+$currentTime
+$currentTimeMins = ([datetime]$currentTime).Hour
+Write-Output "Current time is $currentTimeMins"
+$currentDay = $ISTTime.DayOfWeek.ToString().Substring(0, 2)
+$currentDay
+
+Try {
+    # Get the connection "AzureRunAsConnection "
+
+    $connectionName = az login --service-principal --username $APP_ID --password $CLIENT_SECRET --tenant $TENANT_ID
+}
+
+Catch {
+    If (!$connectionName) {
+        $ErrorMessage = "Connection $connectionName not found."
+        throw $ErrorMessage
+    }
+    Else {
+        Write-Error -Message $_.Exception
+        throw $_.Exception
+    }
+}
 
 
 # $vm= (az vm list --query "[].name" -o tsv)
 
 
-
-# Set your subscription ID
-$subscription_id = "c96c59e0-a3f1-4d5e-bd1b-7d9ca8c9ebdb"
-
-# Start VMs
-# start_vm{
-#     local vm_id=$1
-#     az vm start --ids "$vm_id" --no-wait
-#     echo "Started VM: $vm_id"
-# }
-
-# # Stop VMs
-# stop_vm {
-#     local vm_id=$1
-#     az vm deallocate --ids "$vm_id" --no-wait
-#     Write-Output "Stopped VM: $vm_id"
-# }
-
 # Loop through each VM in the subscription
-$vms = (az vm list --subscription $subscription_id --query "[].id" -o tsv)
+# $vms = (az vm list --subscription $subscription_id --query "[].id" -o tsv)
 
-foreach ($vms in $vms) {
-    Write-Output "VM: $vms"
-    # Check current time against conditions
-    # Modify the conditions as per your specific requirements
+$vms = Import-CSV -Path "filepath"
+
+
+foreach ($vm in $vms) {
+
+    $vmName = $vm.VM_Name
+
+    Write-Output "Virtual Machine Name is $vmName"
+
+    $rg=$vm.Resource_Group
+
+    Write-Output "Resource Group Name is $rg"
+
+    # Get the resource ID of the virtual machine
+    $vm_id=(az vm show --name "$vmName" --resource-group "$rg" --query "id" --output tsv)
+
+    # Print the resource ID
+    Write-Output "Resource ID: $vm_id"
+
+    # Check current time against conditionss
 
     # Example condition: Start the VM if the current hour is between 8 AM and 6 PM
-    $current_hour = (Get-Date).Hour
-    if ( "$current_hour" -ge 23 -and "$current_hour" -lt 24) {
-        az vm start --ids "$vms" --no-wait
-        Write-Output "Stopped VM: $vms"
+    # $current_hour = (Get-Date).Hour
+    if ( "$currentTimeMins" -ge 12 -and "$currentTimeMins" -lt 23) {
+        az vm start --ids "$vm_id" --no-wait
+        Write-Output "Restart of VM: $vmName is succesful "
 
     }
-    if ( "$current_hour" -ge 23 -and "$current_hour" -lt 24) {
+    if ( "$currentTimeMins" -ge 11 -and "$currentTimeMins" -lt 12) {
 
-        az vm deallocate --ids "$vms" --no-wait
-        Write-Output "Stopped VM: $vms"
+        az vm deallocate --ids "$vm_id" --no-wait
+        Write-Output "Stopped VM: $vmName is succesful"
     }
 }
-
-
-
